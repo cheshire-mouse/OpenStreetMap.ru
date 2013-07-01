@@ -1,0 +1,41 @@
+/*
+   InnerLabel style
+
+$Revision: 70 $
+$Date: 2013-06-16 11:57:28 +0400 (Вс., 16 июня 2013) $
+$HeadURL: http://busmap.googlecode.com/svn/trunk/leaflet.innerlabel.css $
+*/
+.leaflet-innerlabel {
+	/*background: rgb(235, 235, 235);*/
+	background: rgba(235, 235, 235, 0.0);
+	background-clip: padding-box;
+	border-color: #777;
+	border-color: rgba(0,0,0,0.0);
+	/*border-radius: 4px;
+	border-style: solid;
+	border-width: 4px;*/
+	color: #111;
+	/*display: block;*/
+	font: 12px/20px "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-weight: bold;
+	padding: 0px 0px;
+	position: absolute;
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	    -ms-user-select: none;
+	        user-select: none;
+	white-space: nowrap;
+	pointer-events:none;
+}
+/*
+.leaflet-innerlabel:before {
+	border-right: 6px solid black;
+	border-right-color: inherit;
+	border-top: 6px solid transparent;
+	border-bottom: 6px solid transparent;
+	content: "";
+	position: absolute;
+	top: 5px;
+	left: -10px;
+}
+*/

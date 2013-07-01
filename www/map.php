@@ -3,6 +3,8 @@ $page_logo = "/img/logo.png";
 
 $page_head_css = <<<PHP_HEAD_CSS
   <link rel="stylesheet" href="/css/leaflet.css" />
+  <link rel="stylesheet" href="/css/leaflet.label.css" />
+  <link rel="stylesheet" href="/css/leaflet.innerlabel.css" />
   <link rel="stylesheet" href="/css/page.map.css" />
   <link rel="stylesheet" href="/css/jstree/jstree.css" />
   <!--[if lte IE 8]>
@@ -13,6 +15,8 @@ PHP_HEAD_CSS;
 
 $page_head_js = <<<PHP_HEAD_JS
   <script src="/js/leaflet.js"></script>
+  <script src="/js/leaflet.label.js"></script>
+  <script src="/js/leaflet.innerlabel.js"></script>
   <script src="/js/osm.common.js"></script>
   <script src="/js/osm.utils.js"></script>
   <script src="/js/osm.utils.search.js"></script>
@@ -36,6 +40,7 @@ $page_head_js = <<<PHP_HEAD_JS
   <script src="/js/poi.js"></script>
   <script src="/js/autocomplete.js"></script>
   <script src="/js/Panoramio.js"></script>
+  <script src="/js/busmap.js"></script>
   <script src="/geo.php"></script>
 PHP_HEAD_JS;
 
@@ -70,6 +75,23 @@ $page_content = <<<PHP_CONTENT
       <div id="leftsearch" class="leftgroup" style="display: none;">
         <h1>Поиск <img class="loader" src="/img/loader.gif" alt=""></h1>
         <div class="leftcontent" style="display: none;"></div>
+      </div>
+      <div id="leftbusmap" class="leftgroup">
+        <h1>I am a busmap</h1>
+        <div class="leftcontent" style="display: none;">
+					<div id="bus-controls">
+						<button id="bus-button-refresh" onclick="btnRefreshOnClick()">get routes</button>
+						<button id="bus-button-checkall" onclick="btnCheckAllOnClick()">*</button>
+						<br>
+						<input type=checkbox id="bus-checkbox-allowstops" onclick="chkAllowStopsOnChange()">
+						<label>Bus stops</label>
+						<br>
+						<input type=checkbox id="bus-checkbox-autorefresh" onclick="chkAutorefreshOnChange()">
+						<label>Autorefresh</label>
+					</div>
+					<div id="bus-list">
+					</div>
+				</div>
       </div>
       <div id="leftpersmap" class="leftgroup">
         <h1>Персональная карта</h1>
