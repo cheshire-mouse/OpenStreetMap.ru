@@ -30,6 +30,8 @@ layerBusstops:null,
 mapRoutes:new Object(),
 mapBusstops:new Object(),
 
+enabled:false,
+
 transportIcons:{
 	bus:"img/bus.png",
 	trolleybus:"img/trolleybus.png",
@@ -55,6 +57,43 @@ initBusmap:function (){
 	this.map.on('popupclose',this.mapOnPopupClose);
 
 },
+
+destroyBusmap:function (){
+	this.removeActiveRouteBusstopsLayers();
+	this.layerRoutes.clearLayers();
+	this.layerBusstops.clearLayers();
+	var td=document.getElementById("bus-list");
+	while (td.firstChild) td.removeChild(td.firstChild);
+	document.getElementById("bus-checkbox-allowstops").checked=false;
+	document.getElementById("bus-checkbox-autorefresh").checked=false;
+	this.enableButtons();
+
+	document.removeEventListener("routesupdateend",this.docOnRoutesUpdateEnd);
+	this.map.off('popupclose',this.mapOnPopupClose);
+	
+	this.map=null;
+	this.routes=new Array();
+	this.busstops=new Array();
+	this.xmlhttp=null;
+	this.activeRoute=null;
+	this.activeBusstop=null;
+	this.busstopsAllowed=true;
+	this.openedPopupLatLng=null;
+	this.openedPopupType=null;
+	this.autoRefresh=false;
+
+	this.visibleCount=0;
+
+	this.cancelNextMapMoveEvent=false;
+
+	this.layerRoutes=null;
+	this.layerBusstops=null;
+
+	this.mapRoutes=new Object();
+	this.mapBusstops=new Object();
+
+},
+
 
 getRoutePopupHTML:function (route,withBusstops){
 	var fields=new Array();
@@ -143,6 +182,8 @@ generateColorFromRef:function (ref){
 },
 
 processJSON:function (){
+	if (!this.enabled || this.xmlhttp==null) return;
+
 	if (this.xmlhttp.readyState != 4) return;
 	if (this.xmlhttp.status != 200){
 		alert(this.xmlhttp.status+" "+this.xmlhttp.statusText);
@@ -228,6 +269,7 @@ processJSON:function (){
 },
 
 requestRoutes:function () {
+	var me=this;
 	var bbox=new Object();
 	bbox.N=this.map.getBounds().getNorthEast().lat;
 	bbox.E=(this.map.getBounds()).getNorthEast().lng;
@@ -239,12 +281,12 @@ requestRoutes:function () {
  	else {
 		return;
 	}
-	json_url='http://198.199.107.98/routes.py/getroutes?'+
+	var json_url='http://198.199.107.98/routes.py/getroutes?'+
 	//json_url='http://postgis/routes.py/getroutes?'+
 		'bboxe='+bbox.E+'&bboxw='+bbox.W+'&bboxn='+bbox.N+'&bboxs='+bbox.S;
 	this.xmlhttp.open("GET",json_url,true);
-	this.xmlhttp.onreadystatechange=function(){osm.busmap.processJSON()}; //stupid js
-	this.xmlhttp.send(null);
+	this.xmlhttp.onreadystatechange=function(){me.processJSON()}; //stupid js
+	this.xmlhttp.send();
 	this.disableButtons();
 },
 
@@ -457,7 +499,6 @@ pad:function (str,num){
 },
 
 btnRefreshOnClick:function () {
-	if (this.map==null) this.initBusmap();
 	if (this.xmlhttp==null) this.requestRoutes();
 },
 
@@ -638,7 +679,19 @@ updatePopupContent:function (){
 
 docOnRoutesUpdateEnd:function (e){
 	this.updatePopupContent();
-}
+},
 
+enable:function(){
+	if (this.enabled) return;
+	this.initBusmap();
+	this.enabled=true;
+	if (this.xmlhttp==null) this.requestRoutes();
+},
+
+disable:function(){
+	if (!this.enabled) return;
+	this.destroyBusmap();
+	this.enabled=false;
+}
 
 }; //osm.busmap

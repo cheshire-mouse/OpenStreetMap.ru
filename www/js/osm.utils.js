@@ -102,6 +102,12 @@ osm.leftpan.item = function(item, on) {
     } else {
       osm.map.removeLayer(osm.layers.osb);
     }
+  } else if (item === 'leftbusmap') {
+    if (on) {
+      osm.busmap.enable();
+    } else {
+      osm.busmap.disable();
+    }
   }
 };
 
