@@ -79,19 +79,19 @@ $page_content = <<<PHP_CONTENT
       <div id="leftbusmap" class="leftgroup">
         <h1>I am a busmap</h1>
         <div class="leftcontent" style="display: none;">
-					<div id="bus-controls">
-						<button id="bus-button-refresh" onclick="btnRefreshOnClick()">get routes</button>
-						<button id="bus-button-checkall" onclick="btnCheckAllOnClick()">*</button>
-						<br>
-						<input type=checkbox id="bus-checkbox-allowstops" onclick="chkAllowStopsOnChange()">
-						<label>Bus stops</label>
-						<br>
-						<input type=checkbox id="bus-checkbox-autorefresh" onclick="chkAutorefreshOnChange()">
-						<label>Autorefresh</label>
-					</div>
-					<div id="bus-list">
-					</div>
-				</div>
+          <div id="bus-controls">
+            <button id="bus-button-refresh" onclick="osm.busmap.btnRefreshOnClick()">refresh</button>
+            <button id="bus-button-checkall" onclick="osm.busmap.btnCheckAllOnClick()">*</button>
+            <br>
+            <input type=checkbox id="bus-checkbox-allowstops" onclick="osm.busmap.chkAllowStopsOnChange()">
+            <label>Bus stops</label>
+            <br>
+            <input type=checkbox id="bus-checkbox-autorefresh" onclick="osm.busmap.chkAutorefreshOnChange()">
+            <label>Autorefresh</label>
+            </div>
+          <div id="bus-list">
+          </div>
+        </div>
       </div>
       <div id="leftpersmap" class="leftgroup">
         <h1>Персональная карта</h1>

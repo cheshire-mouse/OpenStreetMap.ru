@@ -1,95 +1,62 @@
 // busmap scripts
 // author: gryphon
 // license: WTFPL v.2
-// $Revision: 72 $
-// $Date: 2013-06-18 20:18:08 +0400 (Вт., 18 июня 2013) $
-// $HeadURL: http://busmap.googlecode.com/svn/trunk/busmap.js $
 
+osm.busmap={
 
-var map=null;
-var routes=new Array();
-var busstops=new Array();
-var xmlhttp=null;
-var activeRoute=null;
-var activeBusstop=null;
-var busstopsAllowed=true;
-var openedPopupLatLng=null;
-var openedPopupType=null;
-var autoRefresh=false;
+map:null,
+routes:new Array(),
+busstops:new Array(),
+xmlhttp:null,
+activeRoute:null,
+activeBusstop:null,
+busstopsAllowed:true,
+openedPopupLatLng:null,
+openedPopupType:null,
+autoRefresh:false,
 
-var visibleCount=0;
+visibleCount:0,
 
-var defaultRouteStyle={opacity:0.5,weight:5};
-var activeRouteStyle={opacity:1,weight:10};
-var defaultBusstopStyle={opacity:0.5,fillOpacity:0.2,color:"blue",fillColor:"blue"};
-var activeBusstopStyle={opacity:1,fillOpacity:1,color:"blue",fillColor:"orange"};
+defaultRouteStyle:{opacity:0.5,weight:5},
+activeRouteStyle:{opacity:1,weight:10},
+defaultBusstopStyle:{opacity:0.5,fillOpacity:0.2,color:"blue",fillColor:"blue"},
+activeBusstopStyle:{opacity:1,fillOpacity:1,color:"blue",fillColor:"orange"},
 
-var cancelNextMapMoveEvent=false;
+cancelNextMapMoveEvent:false,
 
-var layerRoutes;
-var layerBusstops;
+layerRoutes:null,
+layerBusstops:null,
 
-var mapRoutes;
-var mapBusstops;
+mapRoutes:new Object(),
+mapBusstops:new Object(),
 
-var transportIcons={
+transportIcons:{
 	bus:"img/bus.png",
 	trolleybus:"img/trolleybus.png",
 	tram:"img/tram.png"
-};
+},
 
-function initmap() {
-	// set up the map
-	resizePage();
-	window.onresize=resizePage;
-	map = new L.Map('map');
+initBusmap:function (){
+	this.map = osm.map; 
+	var me=this;
 
-	// create the tile layer with correct attribution
-	var osmUrl='http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-	var osmAttrib='Map data © '+
-		'<a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'+
-		' contributors';
-	var osm = new L.TileLayer(osmUrl, { minZoom: 1, maxZoom: 18, attribution: osmAttrib});		
-
-	map.fitWorld();
-	map.locate({setView:true});
-	map.addLayer(osm);
-
-	layerRoutes=new L.GeoJSON([],{
-		onEachFeature: onEachRouteFeature	
+	this.layerRoutes=new L.GeoJSON([],{
+		onEachFeature: function(data,layer){me.onEachRouteFeature(data,layer)} //stupid js
 	});
-	layerBusstops=new L.GeoJSON([],{
+	this.layerBusstops=new L.GeoJSON([],{
 		pointToLayer: function(data,latlng){
-			return L.circleMarker(latlng,defaultBusstopStyle);
+			return L.circleMarker(latlng,me.defaultBusstopStyle);
 		},
-		onEachFeature: onEachBusstopFeature	
+		onEachFeature: function(data,layer){me.onEachBusstopFeature(data,layer)}
 	});
 
-	busstopsAllowed=document.getElementById("chkAllowStops").checked;
-	document.addEventListener("routesupdateend",docOnRoutesUpdateEnd);
-	map.on('popupclose',mapOnPopupClose);
-}
+	this.busstopsAllowed=document.getElementById("bus-checkbox-allowstops").checked;
+	document.addEventListener("routesupdateend",this.docOnRoutesUpdateEnd);
+	this.map.on('popupclose',this.mapOnPopupClose);
 
-function initBusmap(){
-	map = osm.map; 
+},
 
-	layerRoutes=new L.GeoJSON([],{
-		onEachFeature: onEachRouteFeature	
-	});
-	layerBusstops=new L.GeoJSON([],{
-		pointToLayer: function(data,latlng){
-			return L.circleMarker(latlng,defaultBusstopStyle);
-		},
-		onEachFeature: onEachBusstopFeature	
-	});
-
-	busstopsAllowed=document.getElementById("bus-checkbox-allowstops").checked;
-	document.addEventListener("routesupdateend",docOnRoutesUpdateEnd);
-	map.on('popupclose',mapOnPopupClose);
-
-}
-
-function getRoutePopupHTML(route,withBusstops){
+getRoutePopupHTML:function (route,withBusstops){
 	var fields=new Array();
 	fields.push({id:"ref",name:"Номер"});
 	fields.push({id:"from",name:"Откуда"});
@@ -97,7 +64,7 @@ function getRoutePopupHTML(route,withBusstops){
 	//fields.push({id:"route",name:"Тип"});
 	fields.push({id:"operator",name:"Владелец"});
 	var description="";
-	var iconTag="<img src='"+transportIcons[route["route"]]+"' />";
+	var iconTag="<img src='"+this.transportIcons[route["route"]]+"' />";
 	if (route.name!=null) description +="<h3>"+iconTag+" "+route.name+"</h3>";
 	description+="<table>";
 	for (var i in fields){
@@ -111,16 +78,16 @@ function getRoutePopupHTML(route,withBusstops){
 		for (var i in route.stops){
 			if (i>0) description+="<br>";
 			var stop_id=route.stops[i].osm_id;
-			description+="<a onclick=popupBusstopOnClick(event) value="+stop_id+">";
+			description+="<a onclick=osm.busmap.popupBusstopOnClick(event) value="+stop_id+">";
 			description+=(route.stops[i].name!=null)?(route.stops[i].name):("-???-");
 			description+="</a>";
 		}
 		description+="</div>";
 	}
 	return description;
-}
+},
 
-function getBusstopPopupHTML(stop,withRoutes){
+getBusstopPopupHTML:function (stop,withRoutes){
 	var descr="";
 	if (stop.name!=null)
 		descr="<h3>"+stop.name+"</h3>";
@@ -133,18 +100,18 @@ function getBusstopPopupHTML(stop,withRoutes){
 			descr+="<input type=checkbox "+checked+
 					" id=popup_route_"+route_id+
 					" value="+route_id+
-					" onchange=chkPopupOnChange(event) "+">"+
+					" onchange=osm.busmap.chkPopupOnChange(event) "+">"+
 					"<span style=color:"+stop.routes[i].color+">\u2588 </span>";
-			descr+="<a onclick=popupRouteOnClick(event) value="+route_id+">";
+			descr+="<a onclick=osm.busmap.popupRouteOnClick(event) value="+route_id+">";
 			descr+=stop.routes[i].name;
 			descr+="</a>";
 		}
 		descr+="</div>"
 	}
 	return descr;
-}
+},
 
-function getRouteName(route){
+getRouteName:function (route){
 	var name="";
 	if (route.name!=null) return route.name;
 	if (route.ref!=null) name=route.ref;
@@ -153,11 +120,9 @@ function getRouteName(route){
 		name+=route.from+" - "+route.to;
 	}
 	return name;
-}
+},
 
-	
-
-function generateColorFromRef(ref){
+generateColorFromRef:function (ref){
 	var color;
 	num=parseInt(ref,10);
 	if ( isNaN(num) || num < 1 ) 
@@ -172,33 +137,36 @@ function generateColorFromRef(ref){
 		for (a=astart; a<=aend;a++)
 			if (a/p==Math.floor(a/p)) aend++;
 		a--;
-		color="#"+pad( Math.floor(1.0*a/b*0xffffff).toString(16) , 6 );
+		color="#"+this.pad( Math.floor(1.0*a/b*0xffffff).toString(16) , 6 );
 	}
 	return color;
-}
+},
 
-function processJSON(){
-	if (xmlhttp.readyState != 4) return;
-	if (xmlhttp.status != 200){
-		alert(xmlhttp.status+" "+xmlhttp.statusText);
+processJSON:function (){
+	if (this.xmlhttp.readyState != 4) return;
+	if (this.xmlhttp.status != 200){
+		alert(this.xmlhttp.status+" "+this.xmlhttp.statusText);
 		enableButtons();
 		return;
 	}
-	var routesJson=JSON.parse(xmlhttp.responseText);
+	var routesJson=JSON.parse(this.xmlhttp.responseText);
 
 	var allVisible=false;
-	allVisible=(visibleCount==routes.length);
+	allVisible=(this.visibleCount==this.routes.length);
 	var mapVisibleRoutes=new Object();
 	if (!allVisible)
 		for (var i in routes)
 			if (routes[i].isVisible) mapVisibleRoutes[routes[i].osm_id]=true;
-	visibleCount=0;
-	removeActiveRouteBusstopsLayers();
-	layerRoutes.clearLayers();
-	layerBusstops.clearLayers();
+	this.visibleCount=0;
+	this.removeActiveRouteBusstopsLayers();
+	this.layerRoutes.clearLayers();
+	this.layerBusstops.clearLayers();
 
-	busstops=routesJson["busstops"];
-	mapBusstops=new Object();
+	this.busstops=routesJson["busstops"];
+	this.mapBusstops=new Object();
+	var busstops=this.busstops;
+	var mapBusstops=this.mapBusstops;
+
 	var activeBusstopFound=false;
 	for (var i in busstops){
 		mapBusstops[busstops[i].osm_id]=busstops[i];
@@ -206,21 +174,23 @@ function processJSON(){
 		busstops[i].visibleRoutes=0;
 		busstops[i].point.properties=new Object();
 		busstops[i].point.properties.osm_id=busstops[i].osm_id;
-		if (activeBusstop!=null && busstops[i].osm_id==activeBusstop.osm_id){
-			activeBusstop=busstops[i];
+		if (this.activeBusstop!=null && busstops[i].osm_id==this.activeBusstop.osm_id){
+			this.activeBusstop=busstops[i];
 			activeBusstopFound=true;
 		}
 	}
-	if (!activeBusstopFound) activeBusstop=null;
+	if (!activeBusstopFound) this.activeBusstop=null;
 
-	routes=routesJson["routes"];
-	
-	mapRoutes=new Object();
+	this.routes=routesJson["routes"];
+	this.mapRoutes=new Object();
+	var routes=this.routes;
+	var mapRoutes=this.mapRoutes;
+
 	var newActiveRoute=null;
 	for ( var i in routes ) {
-		routes[i].name=getRouteName(routes[i]);
-		if (routes[i].color==null)  routes[i].color=generateColorFromRef(routes[i].ref);
-		if (routes[i].color==null)  routes[i].color=generateColorFromRef(routes[i].osm_id);
+		routes[i].name=this.getRouteName(routes[i]);
+		if (routes[i].color==null)  routes[i].color=this.generateColorFromRef(routes[i].ref);
+		if (routes[i].color==null)  routes[i].color=this.generateColorFromRef(routes[i].osm_id);
 		if (allVisible || mapVisibleRoutes[routes[i].osm_id]==true)
 			routes[i].isVisible=true;
 		routes[i].stops=new Array();
@@ -231,41 +201,40 @@ function processJSON(){
 			routes[i].stops.push(stop);
 			stop.routes.push(routes[i]);
 		}
-		routes[i].popupContent=getRoutePopupHTML(routes[i],true);
+		routes[i].popupContent=this.getRoutePopupHTML(routes[i],true);
 		//console.debug(routes[i].name);
-		routes[i].lines.coordinates=mergeLines(routes[i].lines.coordinates);
+		routes[i].lines.coordinates=this.mergeLines(routes[i].lines.coordinates);
 		routes[i].lines.properties=new Object();
 		routes[i].lines.properties.color=routes[i].color;
 		routes[i].lines.properties.osm_id=routes[i].osm_id;
 		mapRoutes[routes[i].osm_id]=routes[i];
-		if (activeRoute!=null && routes[i].osm_id==activeRoute.osm_id)
+		if (this.activeRoute!=null && routes[i].osm_id==this.activeRoute.osm_id)
 			newActiveRoute=routes[i];
 	}
-	routes.sort(compareRoutes);
+	routes.sort(this.compareRoutes);
 	for (var i in busstops)
-		busstops[i].popupContent=getBusstopPopupHTML(busstops[i],true);
+		busstops[i].popupContent=this.getBusstopPopupHTML(busstops[i],true);
 	for (var i in routes)
-		addRouteToLayer(routes[i]);
-	addLayers();
-	if (busstopsAllowed) layerBusstops.bringToFront();
-	activeRoute=null;
-	if (newActiveRoute!=null) activateRoute(newActiveRoute,null);
-	createCheckboxes();
-	enableButtons();
-	xmlhttp=null;
+		this.addRouteToLayer(routes[i]);
+	this.addLayers();
+	if (this.busstopsAllowed) layerBusstops.bringToFront();
+	this.activeRoute=null;
+	if (newActiveRoute!=null) this.activateRoute(newActiveRoute,null);
+	this.createCheckboxes();
+	this.enableButtons();
+	this.xmlhttp=null;
 	var evn=new CustomEvent("routesupdateend");
 	document.dispatchEvent(evn);
-}
+},
 
-
-function requestRoutes() {
+requestRoutes:function () {
 	var bbox=new Object();
-	bbox.N=map.getBounds().getNorthEast().lat;
-	bbox.E=(map.getBounds()).getNorthEast().lng;
-	bbox.S=map.getBounds().getSouthWest().lat;
-	bbox.W=map.getBounds().getSouthWest().lng;
+	bbox.N=this.map.getBounds().getNorthEast().lat;
+	bbox.E=(this.map.getBounds()).getNorthEast().lng;
+	bbox.S=this.map.getBounds().getSouthWest().lat;
+	bbox.W=this.map.getBounds().getSouthWest().lng;
 	if (window.XMLHttpRequest) {
-   		xmlhttp=new XMLHttpRequest();
+   		this.xmlhttp=new XMLHttpRequest();
 	   }
  	else {
 		return;
@@ -273,14 +242,16 @@ function requestRoutes() {
 	json_url='http://198.199.107.98/routes.py/getroutes?'+
 	//json_url='http://postgis/routes.py/getroutes?'+
 		'bboxe='+bbox.E+'&bboxw='+bbox.W+'&bboxn='+bbox.N+'&bboxs='+bbox.S;
-	xmlhttp.open("GET",json_url,true);
-	xmlhttp.onreadystatechange=processJSON;
-	xmlhttp.send(null);
-	disableButtons();
-}
+	this.xmlhttp.open("GET",json_url,true);
+	this.xmlhttp.onreadystatechange=function(){osm.busmap.processJSON()}; //stupid js
+	this.xmlhttp.send(null);
+	this.disableButtons();
+},
 
-function createCheckboxes(){
-	td=document.getElementById("divRoutesList");
+createCheckboxes:function (){
+	var routes=this.routes;
+	var me=this;
+	var td=document.getElementById("bus-list");
 	while (td.firstChild) td.removeChild(td.firstChild);
 	
 	for (var i in routes){
@@ -289,13 +260,13 @@ function createCheckboxes(){
 		checkbox.id="route_"+routes[i].osm_id;
 		checkbox.value=routes[i].osm_id;
 		if (routes[i].isVisible) checkbox.checked=true;
-		checkbox.addEventListener("change",checkOnChange);
+		checkbox.addEventListener("change",function(e){me.checkOnChange(e)});
 		var span=document.createElement("span");
 		span.style.color=routes[i].color;
 		colorMarker=document.createTextNode("\u2588 ");
 		var href=document.createElement("a");
 		href.textContent=routes[i].name;
-		href.addEventListener("click",listRouteOnClick);
+		href.addEventListener("click",function(e){me.listRouteOnClick(e)});
 		href.value=routes[i].osm_id;
 		var br=document.createElement('br');
 		span.appendChild(colorMarker);
@@ -304,133 +275,135 @@ function createCheckboxes(){
 		td.appendChild(href);
 		td.appendChild(br);
 	}
-}
+},
 
-function onEachRouteFeature(data,layer){
+onEachRouteFeature:function (data,layer){
+	var me=this;
 	layer.setStyle({color:data.properties.color});
-	var route=mapRoutes[data.properties.osm_id];
-	layer.on('click',routeOnClick);
-	layer.on('contextmenu',routeOnContextmenu);
+	var route=this.mapRoutes[data.properties.osm_id];
+	layer.on('click',function(e){me.routeOnClick(e)});
+	layer.on('contextmenu',function(e){me.routeOnContextmenu(e)});
 	route.layer=layer;
 	layer.bindLabel(route.name);
-}
+},
 
-function onEachBusstopFeature(data,layer){
-	var busstop=mapBusstops[data.properties.osm_id];
-	layer.on('click',busstopOnClick);
-	layer.on('contextmenu',busstopOnClick);
+onEachBusstopFeature:function (data,layer){
+	var me=this;
+	var busstop=this.mapBusstops[data.properties.osm_id];
+	layer.on('click',function(e){me.busstopOnClick(e)});
+	layer.on('contextmenu',function(e){me.busstopOnClick(e)});
 	busstop.layer=layer;
 	layer.bindLabel(busstop.name,{noHide:true});
-}
+},
 
-function addLayers(){
-	map.addLayer(layerRoutes);
-	if (busstopsAllowed) map.addLayer(layerBusstops);
-}
+addLayers:function (){
+	this.map.addLayer(this.layerRoutes);
+	if (this.busstopsAllowed) this.map.addLayer(this.layerBusstops);
+},
 
-function disableButtons(){
-	document.getElementById("btnRefresh").disabled=true;
-}
+disableButtons:function (){
+	document.getElementById("bus-button-refresh").disabled=true;
+},
 
-function enableButtons(){
-	document.getElementById("btnRefresh").disabled=false;
-}
+enableButtons:function (){
+	document.getElementById("bus-button-refresh").disabled=false;
+},
 
-function checkOnChange(e){
+checkOnChange:function (e){
 	var routeid=e.target.value;
 	var isChecked=e.target.checked;
-	var route=mapRoutes[routeid];
+	var route=this.mapRoutes[routeid];
 	chkPopup=document.getElementById("popup_route_"+routeid);
 	if (chkPopup != null) chkPopup.checked=isChecked;
-	setRouteVisibility(route,isChecked);
-	if (isChecked) moveActiveRouteToFront();
-}
+	this.setRouteVisibility(route,isChecked);
+	if (isChecked) this.moveActiveRouteToFront();
+},
 
-function chkPopupOnChange(e){
+chkPopupOnChange:function (e){
 	var isChecked=e.target.checked;
 	var routeid=e.target.value;
-	var route=mapRoutes[routeid];
+	var route=this.mapRoutes[routeid];
 	document.getElementById("route_"+routeid).checked=isChecked;
-	setRouteVisibility(route,isChecked);
-	if (isChecked) moveActiveRouteToFront();
-}
+	this.setRouteVisibility(route,isChecked);
+	if (isChecked) this.moveActiveRouteToFront();
+},
 
-function addRouteToLayer(route){
-	layerRoutes.addData(route.lines);
-	if (route.isVisible) visibleCount++;
-	else layerRoutes.removeLayer(route.layer);
+addRouteToLayer:function (route){
+	this.layerRoutes.addData(route.lines);
+	if (route.isVisible) this.visibleCount++;
+	else this.layerRoutes.removeLayer(route.layer);
 	for (var i in route.stops){
 		var stop=route.stops[i];
-		if (stop.visibleRoutes==0) layerBusstops.addData(stop.point);
+		if (stop.visibleRoutes==0) this.layerBusstops.addData(stop.point);
 		if (route.isVisible) stop.visibleRoutes++;
-		if (stop.visibleRoutes==0) layerBusstops.removeLayer(stop.layer);
+		if (stop.visibleRoutes==0) this.layerBusstops.removeLayer(stop.layer);
 	}
 
-}
+},
 
-function setRouteVisibility(route,isVisible){
+setRouteVisibility:function (route,isVisible){
 	if (route.isVisible==isVisible) return;
 	route.isVisible=isVisible;
 	if (isVisible){
-		visibleCount++;
-		layerRoutes.addLayer(route.layer);
+		this.visibleCount++;
+		this.layerRoutes.addLayer(route.layer);
 		for (var i in route.stops){
 			route.stops[i].visibleRoutes++;
-			layerBusstops.addLayer(route.stops[i].layer);
+			this.layerBusstops.addLayer(route.stops[i].layer);
 		}
-		if (activeRoute==route && !busstopsAllowed) 
-			addActiveRouteBusstopsLayers();
+		if (this.activeRoute==route && !this.busstopsAllowed) 
+			this.addActiveRouteBusstopsLayers();
 	}
 	else {
-		visibleCount--;
-		layerRoutes.removeLayer(route.layer);
+		this.visibleCount--;
+		this.layerRoutes.removeLayer(route.layer);
 		for (var i in route.stops){
 			route.stops[i].visibleRoutes--;
 			if (route.stops[i].visibleRoutes==0)
-				layerBusstops.removeLayer(route.stops[i].layer);
+				this.layerBusstops.removeLayer(route.stops[i].layer);
 		}
-		if (activeRoute==route && !busstopsAllowed) 
-			removeActiveRouteBusstopsLayers();
+		if (this.activeRoute==route && !this.busstopsAllowed) 
+			this.removeActiveRouteBusstopsLayers();
 	}
-}
+},
 
-function chkAllowStopsOnChange(){
-	var chk=document.getElementById("chkAllowStops")
-	busstopsAllowed=chk.checked;
-	if ( busstopsAllowed ) {
-		map.addLayer(layerBusstops);
-		addActiveRouteBusstopsLayers();
-		moveActiveRouteToFront();
+chkAllowStopsOnChange:function (){
+	var chk=document.getElementById("bus-checkbox-allowstops")
+	this.busstopsAllowed=chk.checked;
+	if ( this.busstopsAllowed ) {
+		this.map.addLayer(this.layerBusstops);
+		this.addActiveRouteBusstopsLayers();
+		this.moveActiveRouteToFront();
 	}
 	else  {
-		map.removeLayer(layerBusstops);
-		addActiveRouteBusstopsLayers();
+		this.map.removeLayer(this.layerBusstops);
+		this.addActiveRouteBusstopsLayers();
 	}
-}
+},
 
-function checkAll(){
-	var visible=(visibleCount<routes.length);
-	for (var i=0; i<routes.length;i++){
-		document.getElementById("route_"+routes[i].osm_id).checked=visible;
-		chkPopup=document.getElementById("popup_route_"+routes[i].osm_id);
+checkAll:function (){
+	var visible=(this.visibleCount<routes.length);
+	for (var i=0; i<this.routes.length;i++){
+		document.getElementById("route_"+this.routes[i].osm_id).checked=visible;
+		chkPopup=document.getElementById("popup_route_"+this.routes[i].osm_id);
 		if (chkPopup != null) chkPopup.checked=visible;
-		setRouteVisibility(routes[i],visible);
+		this.setRouteVisibility(this.routes[i],visible);
 	}
-	if (visible && busstopsAllowed) layerBusstops.bringToFront();
-	if (visible) moveActiveRouteToFront();
-}
+	if (visible && this.busstopsAllowed) this.layerBusstops.bringToFront();
+	if (visible) this.moveActiveRouteToFront();
+},
 
-function moveActiveRouteToFront(){
-	if (activeRoute==null || !activeRoute.isVisible) return;
-	activeRoute.layer.bringToFront();
-	for (var i in activeRoute.stops)
-		activeRoute.stops[i].layer.bringToFront();
-}
+moveActiveRouteToFront:function (){
+	if (this.activeRoute==null || !this.activeRoute.isVisible) return;
+	this.activeRoute.layer.bringToFront();
+	for (var i in this.activeRoute.stops)
+		this.activeRoute.stops[i].layer.bringToFront();
+},
 
 //merge adjucent lines in the array of lines
 //result is still array of lines (if there are no gaps
 //it will contain only one element)
-function mergeLines(arLines){
+mergeLines:function (arLines){
         //console.debug("mergeLines, in: "+arLines.length);
         if (arLines.length<2) return arLines;
         var arMergedLines=new Array();
@@ -439,15 +412,15 @@ function mergeLines(arLines){
                 ar1last=arLines[i][arLines[i].length-1];
                 ar2first=arLines[i+1][0];
                 ar2last=arLines[i+1][arLines[i+1].length-1];
-                if ( pairsEqual(ar1first,ar2first) ) arLines[i].reverse();
-                else if ( pairsEqual(ar1last,ar2last) ) arLines[i+1].reverse();
-                else if ( pairsEqual(ar1first,ar2last) ) {
+                if ( this.pairsEqual(ar1first,ar2first) ) arLines[i].reverse();
+                else if ( this.pairsEqual(ar1last,ar2last) ) arLines[i+1].reverse();
+                else if ( this.pairsEqual(ar1first,ar2last) ) {
                         arLines[i].reverse();
                         arLines[i+1].reverse();
                 }
                 ar2first=arLines[i+1][0];
                 ar1last=arLines[i][arLines[i].length-1];
-                if ( pairsEqual(ar2first,ar1last) ){
+                if ( this.pairsEqual(ar2first,ar1last) ){
                         arLines[i].pop();
                         arLines[i+1]=arLines[i].concat(arLines[i+1]);
                 }
@@ -456,72 +429,73 @@ function mergeLines(arLines){
         arMergedLines.push(arLines[arLines.length-1]);
         //console.debug("mergeLines, out: "+arMergedLines.length);
         return arMergedLines;
-} 
+}, 
 
-function pairsEqual(a,b){
+pairsEqual:function (a,b){
 	return ( a[0] == b[0] && a[1] == b[1] );
-}
+},
 
-function compareRoutes(a,b){
+compareRoutes:function (a,b){
 	if (a.name < b.name)
 		return -1;
 	if (a.name > b.name)
 		return 1;
 	return 0;
-}
+},
 
-function compareRefs(a,b){
+compareRefs:function (a,b){
 	if (parseInt(a) < parseInt(b)) return -1;
 	if (parseInt(a) > parseInt(b)) return 1;
 	if ( a < b ) return -1;
 	if ( a > b ) return 1;
 	return 0;
-}
+},
 
-function pad(str,num){
+pad:function (str,num){
 	var result_str="000000000000000000"+str;
 	return result_str.substring(result_str.length-num,result_str.length);
-}
+},
 
-function btnRefreshOnClick() {
-	if (map==null) initBusmap();
-	if (xmlhttp==null) requestRoutes();
-}
+btnRefreshOnClick:function () {
+	if (this.map==null) this.initBusmap();
+	if (this.xmlhttp==null) this.requestRoutes();
+},
 
-function btnCheckAllOnClick() {
-	checkAll();
-}
+btnCheckAllOnClick:function () {
+	this.checkAll();
+},
 
-function chkAutorefreshOnChange(){
-	var chk=document.getElementById("chkAutorefresh");
+chkAutorefreshOnChange:function (){
+	var me=this;	
+	var chk=document.getElementById("bus-checkbox-autorefresh");
 	autoRefresh=chk.checked;
-	if (chk.checked) map.on('moveend',mapOnMoveend);
-	else map.off('moveend',mapOnMoveend);
-}
+	if (chk.checked) this.map.on('moveend',function(e){me.mapOnMoveend(e)});
+	else this.map.off('moveend',function(e){me.mapOnMoveend(e)});
+},
 
-function activateRoute(route,popupCoord){
+activateRoute:function (route,popupCoord){
 	var layer=route.layer;
-	if (activeRoute!=null){ 
-		setRouteStyle(activeRoute,false);
-		updateBusstopsIndexes(activeRoute,false);
-		removeActiveRouteBusstopsLayers();
-		if (busstopsAllowed) layerBusstops.bringToFront();
+	if (this.activeRoute!=null){ 
+		this.setRouteStyle(this.activeRoute,false);
+		this.updateBusstopsIndexes(this.activeRoute,false);
+		this.removeActiveRouteBusstopsLayers();
+		if (this.busstopsAllowed) this.layerBusstops.bringToFront();
 	}
-	if (activeRoute!=null && activeRoute.osm_id==route.osm_id)	{
-		activeRoute=null;
+	if (this.activeRoute!=null && this.activeRoute.osm_id==route.osm_id)	{
+		this.activeRoute=null;
 		//map.closePopup();
 	}
 	else {
-		activeRoute=route;
-		setRouteStyle(route,true);
-		addActiveRouteBusstopsLayers();
-		updateBusstopsIndexes(route,true);
-		moveActiveRouteToFront();
-		if (popupCoord!=null) openPopup(popupCoord,route.popupContent,"route",true);
+		this.activeRoute=route;
+		this.setRouteStyle(route,true);
+		this.addActiveRouteBusstopsLayers();
+		this.updateBusstopsIndexes(route,true);
+		this.moveActiveRouteToFront();
+		if (popupCoord!=null) this.openPopup(popupCoord,route.popupContent,"route",true);
 	}
-}
+},
 
-function updateBusstopsIndexes(route,withIndex){
+updateBusstopsIndexes:function (route,withIndex){
 	for (var i=route.stops.length-1;i>=0;i--){
 		var index=parseInt(i)+1;
 		route.stops[i].layer.unbindInnerLabel();
@@ -530,173 +504,141 @@ function updateBusstopsIndexes(route,withIndex){
 			route.stops[i].layer.showInnerLabel();
 		}
 	}
-}
+},
 
-function addActiveRouteBusstopsLayers(){
-	if (activeRoute==null) return;
-	var route=activeRoute;
-	if (busstopsAllowed) return;
+addActiveRouteBusstopsLayers:function (){
+	if (this.activeRoute==null) return;
+	var route=this.activeRoute;
+	if (this.busstopsAllowed) return;
 	for (var i in route.stops) 
-		map.addLayer(route.stops[i].layer);
-}
+		this.map.addLayer(route.stops[i].layer);
+},
 
-function removeActiveRouteBusstopsLayers(){
-	if (activeRoute==null) return;
-	var route=activeRoute;
-	if (busstopsAllowed) return;
+removeActiveRouteBusstopsLayers:function (){
+	if (this.activeRoute==null) return;
+	var route=this.activeRoute;
+	if (this.busstopsAllowed) return;
 	for (var i in route.stops) 
-		map.removeLayer(route.stops[i].layer);
-}
+		this.map.removeLayer(route.stops[i].layer);
+},
 
-function setRouteStyle(route,active){
+setRouteStyle:function (route,active){
 	if (route==null) return;
 	var busstopStyle,routeStyle; 
 	if (active){
-		routeStyle=activeRouteStyle;
-		busstopStyle=activeBusstopStyle;
+		routeStyle=this.activeRouteStyle;
+		busstopStyle=this.activeBusstopStyle;
 	}
 	else{
-		routeStyle=defaultRouteStyle;
-		busstopStyle=defaultBusstopStyle;
+		routeStyle=this.defaultRouteStyle;
+		busstopStyle=this.defaultBusstopStyle;
 	}
 	route.layer.setStyle(routeStyle);
 	for (var i in route.stops) 
 		route.stops[i].layer.setStyle(busstopStyle);
-}
+},
 
-function routeOnClick(e){
+routeOnClick:function (e){
 	var layer=e.target;
 	var popupCoord=e.latlng;
 	var routeid=layer.feature.properties.osm_id;
 	//hideLabel doesn't work, so create new label to make it hide
 	layer.unbindLabel();
-	layer.bindLabel(mapRoutes[routeid].name);
-	map.closePopup();
-	activateRoute(mapRoutes[routeid],null);
-}
+	layer.bindLabel(this.mapRoutes[routeid].name);
+	this.map.closePopup();
+	this.activateRoute(this.mapRoutes[routeid],null);
+},
 
-function routeOnContextmenu(e){
+routeOnContextmenu:function (e){
 	var layer=e.target;
 	var popupCoord=e.latlng;
 	var routeid=layer.feature.properties.osm_id;
-	openPopup(popupCoord,mapRoutes[routeid].popupContent,"route",true);
-}
+	this.openPopup(popupCoord,this.mapRoutes[routeid].popupContent,"route",true);
+},
 
-function popupRouteOnClick(e){
+popupRouteOnClick:function (e){
 	var route_ind=e.target.attributes.value.value;
-	var route=mapRoutes[route_ind];
-	var popupCoord=openedPopupLatLng;
-	activateRoute(route,null);
+	var route=this.mapRoutes[route_ind];
+	var popupCoord=this.openedPopupLatLng;
+	this.activateRoute(route,null);
 	//if (activeRoute==null) activateRoute(route,null);
-}
+},
 
-function listRouteOnClick(e){
+listRouteOnClick:function (e){
 	var route_id=e.target.value;
-	var route=mapRoutes[route_id];
+	var route=this.mapRoutes[route_id];
 	var popupCoord=route.layer.getBounds().getCenter();
-	map.setView(popupCoord,map.getZoom());
-	activateRoute(route,null);
-	if (activeRoute==null) activateRoute(route,null);
-}
+	this.map.setView(popupCoord,this.map.getZoom());
+	this.activateRoute(route,null);
+	if (this.activeRoute==null) this.activateRoute(route,null);
+},
 
-function activateBusstop(layer){
+activateBusstop:function (layer){
 	var stopid=layer.feature.properties.osm_id;
-	var stop=mapBusstops[stopid];
-	activeBusstop=stop;
-	openPopup(layer.getLatLng(),stop.popupContent,"busstop",true);
-}
+	var stop=this.mapBusstops[stopid];
+	this.activeBusstop=stop;
+	this.openPopup(layer.getLatLng(),stop.popupContent,"busstop",true);
+},
 
-function openPopup(latlng,popupContent,type,autoPan){
-	var oldBounds=map.getBounds();
-	map.closePopup();
+openPopup:function (latlng,popupContent,type,autoPan){
+	var oldBounds=this.map.getBounds();
+	this.map.closePopup();
 	var popup = L.popup({autoPan:autoPan});
-	openedPopupLatLng=latlng;
-	openedPopupType=type;
+	this.openedPopupLatLng=latlng;
+	this.openedPopupType=type;
 	popup.setLatLng(latlng);
 	popup.setContent(popupContent);
-	map.openPopup(popup);
+	this.map.openPopup(popup);
 	//sync routes' checkboxes state
-	if (openedPopupType=="busstop") 
-		for (var i in activeBusstop.routes){
-			var route=activeBusstop.routes[i];
+	if (this.openedPopupType=="busstop") 
+		for (var i in this.activeBusstop.routes){
+			var route=this.activeBusstop.routes[i];
 			document.getElementById("popup_route_"+route.osm_id).checked=route.isVisible;	
 		}
-	if ( !oldBounds.equals(map.getBounds()) ) cancelNextMapMoveEvent=true; 
-}
+	if ( !oldBounds.equals(this.map.getBounds()) ) this.cancelNextMapMoveEvent=true; 
+},
 
-function busstopOnClick(e){
+busstopOnClick:function (e){
 	var layer=e.target;
-	activateBusstop(layer);
-}
-function popupBusstopOnClick(e){
+	this.activateBusstop(layer);
+},
+
+popupBusstopOnClick:function (e){
 	var stopid=e.target.attributes.value.value;
-	var layer=mapBusstops[stopid].layer;
-	map.setView(layer.getLatLng(),map.getZoom());
-	activateBusstop(layer);
-}
+	var layer=this.mapBusstops[stopid].layer;
+	this.map.setView(layer.getLatLng(),this.map.getZoom());
+	this.activateBusstop(layer);
+},
 
-
-function mapOnMoveend(e){
-	if (cancelNextMapMoveEvent){
-		cancelNextMapMoveEvent=false;
+mapOnMoveend:function (e){
+	if (this.cancelNextMapMoveEvent){
+		this.cancelNextMapMoveEvent=false;
 		return;
 	}
-	if (xmlhttp==null) requestRoutes();
-}
+	if (this.xmlhttp==null) this.requestRoutes();
+},
 
-function mapOnPopupClose(e){
-	openedPopupLatLng=null;
-	openedPopupType=null;
-}
+mapOnPopupClose:function (e){
+	this.openedPopupLatLng=null;
+	this.openedPopupType=null;
+},
 
-function resizePage(){
-	var height = 0;
-	var width = 0;
-	var listWidthPx=250;
-	var listWidthPercents=0.25;
-	var padding=10;
-	var body = window.document.body;
-	if (window.innerHeight) {
-		height = window.innerHeight;
-	} else if (body.parentElement.clientHeight) {
-		height = body.parentElement.clientHeight;
-	} else if (body && body.clientHeight) {
-		height = body.clientHeight;
-	}
-	if (window.innerWidth) {
-		width = window.innerWidth;
-	} else if (body.parentElement.clientWidth) {
-		width = body.parentElement.clientWidth;
-	} else if (body && body.clientWidth) {
-		width = body.clientWidth;
-	}
-	var divMap=document.getElementById("map");
-	var divList=document.getElementById("divRoutesList");
-	var divControls=document.getElementById("divControls");
-	var listWidth=Math.min(listWidthPx,width*listWidthPercents);
-	divControls.style.width=listWidth+"px";
-	controlsHeight=divControls.offsetHeight;
-	divList.style.width=listWidth+"px";
-	divList.style.height=(height-controlsHeight-padding*4)+"px";
-	divList.style.top=(controlsHeight+1)+"px";
-	divMap.style.width=(width-listWidth-padding*2)+"px";
-	divMap.style.height=height+"px";
-	divMap.style.left=(listWidth+padding*2+1)+"px";
-}
-
-function updatePopupContent(){
-	if (openedPopupType==null) return;
+updatePopupContent:function (){
+	if (this.openedPopupType==null) return;
 	var activeObject=null;
-	if (openedPopupType=="route") activeObject=null;
-	if (openedPopupType=="busstop") activeObject=activeBusstop;
+	if (this.openedPopupType=="route") activeObject=null;
+	if (this.openedPopupType=="busstop") activeObject=this.activeBusstop;
 	if (activeObject==null){
-		map.closePopup();
+		this.map.closePopup();
 		return;
 	}
 	var content=activeObject.popupContent;
-	openPopup(openedPopupLatLng,content,openedPopupType,false);
+	this.openPopup(this.openedPopupLatLng,content,this.openedPopupType,false);
+},
+
+docOnRoutesUpdateEnd:function (e){
+	this.updatePopupContent();
 }
 
-function docOnRoutesUpdateEnd(e){
-	updatePopupContent();
-}
+
+}; //osm.busmap
