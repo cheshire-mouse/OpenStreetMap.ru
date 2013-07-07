@@ -266,6 +266,7 @@ processJSON:function (){
 	this.xmlhttp=null;
 	var evn=new CustomEvent("routesupdateend");
 	document.dispatchEvent(evn);
+	$("#leftbusmap .loader").removeClass('on');
 },
 
 requestRoutes:function () {
@@ -288,6 +289,7 @@ requestRoutes:function () {
 	this.xmlhttp.onreadystatechange=function(){me.processJSON()}; //stupid js
 	this.xmlhttp.send();
 	this.disableButtons();
+	$("#leftbusmap .loader").addClass('on');
 },
 
 createCheckboxes:function (){

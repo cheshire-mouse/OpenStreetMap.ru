@@ -77,7 +77,7 @@ $page_content = <<<PHP_CONTENT
         <div class="leftcontent" style="display: none;"></div>
       </div>
       <div id="leftbusmap" class="leftgroup">
-        <h1>I am a busmap</h1>
+        <h1>I am a busmap<img class="loader" src="/img/loader.gif" alt=""></h1>
         <div class="leftcontent" style="display: none;">
           <div id="bus-controls">
             <button id="bus-button-refresh" onclick="osm.busmap.btnRefreshOnClick()">refresh</button>
